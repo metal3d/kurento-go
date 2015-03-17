@@ -17,6 +17,8 @@ With Go at server side, you only need to implement browser to application messag
 
 Your application will communicate streams information to KMS via Kurento Go Package and to clients.
 
+See doc at https://godoc.org/github.com/metal3d/kurento-go
+
 Example:
 --------
 
