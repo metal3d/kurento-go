@@ -11,6 +11,7 @@ var debug = false
 
 // Debug activate debug information.
 func Debug(state bool) {
+func SetDebug(state bool) {
 	debug = state
 }
 

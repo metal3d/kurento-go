@@ -47,9 +47,9 @@ func (elem *WebRtcEndpoint) GatherCandidates() error {
 	// Call server and wait response
 	response := <-elem.connection.Request(req)
 
+	// Otherwise we want to wait for the other candidates
 	// Returns error or nil
 	return response.Error
-
 }
 
 // Provide a remote ICE candidate
@@ -73,3 +73,4 @@ func (elem *WebRtcEndpoint) AddIceCandidate(candidate IceCandidate) error {
 	return response.Error
 
 }
+
