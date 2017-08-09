@@ -1,6 +1,9 @@
 package kurento
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	)
 
 // Base for all objects that can be created in the media server.
 type MediaObject struct {
@@ -33,6 +36,39 @@ type MediaObject struct {
 func (elem *MediaObject) getConstructorParams(from IMediaObject, options map[string]interface{}) map[string]interface{} {
 	return options
 
+}
+
+func (elem *MediaObject) Subscribe(eventType string, handler SubscriptionHandler) (error) {
+
+	req := elem.getSubscribeRequest()
+
+	// params := make(map[string]interface{})
+
+	req["params"] = map[string]interface{}{
+		"type":       eventType,
+		"object":          elem.Id,
+	}
+	// Call server and go run to the 
+	message := <-elem.connection.Request(req)
+	if message.Error != nil {
+		log.Println("Error trying to subscribe to " + eventType)
+		return message.Error
+	}
+
+	c := elem.connection.Subscribe(eventType,elem.Id)
+	go func() {
+		for {
+			msg := <-c
+			handler.Handle(msg)
+		}
+	}()
+
+	// Returns error or nil
+	return message.Error
+}
+func (elem *MediaObject) Unsubscribe(eventType string, subscriptionId string) (error) {
+	elem.connection.Unsubscribe(eventType,elem.Id)
+	return nil
 }
 
 type IServerManager interface {
@@ -281,7 +317,7 @@ func (elem *SdpEndpoint) GenerateOffer() (string, error) {
 
 	// Call server and wait response
 	response := <-elem.connection.Request(req)
-
+	// fmt.Println(response.Result["value"])
 	// // The SDP offer.
 
 	return response.Result["value"], response.Error

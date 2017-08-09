@@ -14,6 +14,10 @@ func SetDebug(state bool) {
 	debug = state
 }
 
+type SubscriptionHandler interface {
+	Handle (event Response)
+}
+
 // IMadiaElement implements some basic methods as getConstructorParams or Create().
 type IMediaObject interface {
 
@@ -23,6 +27,12 @@ type IMediaObject interface {
 	// Each media object should be able to create another object
 	// Those options are sent to getConstructorParams
 	Create(IMediaObject, map[string]interface{})
+
+	// Add a subscription to event of "type"
+	Subscribe(eventType string, handler SubscriptionHandler) (error)
+
+	// remove a subscription to event of 
+	Unsubscribe(eventType string, subscriptionId string) (error)
 
 	// Set ID of the element
 	setId(string)
@@ -103,6 +113,12 @@ func (m *MediaObject) getInvokeRequest() map[string]interface{} {
 	return req
 }
 
+func (m *MediaObject) getSubscribeRequest() map[string]interface{} {
+	req := m.getCreateRequest()
+	req["method"] = "subscribe"
+
+	return req
+}
 // String implements fmt.Stringer interface, return ID
 func (m *MediaObject) String() string {
 	return m.Id

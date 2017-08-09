@@ -26,11 +26,32 @@ type Response struct {
 	Id      float64
 	Result  map[string]string // should change if result has no several form
 	Error   *Error
+	Method  string
+	Params  params
+}
+
+type params struct {
+	Value  value
+	Object string
+	Type string
+}
+
+type value struct {
+	Data data
+}
+
+type data struct {
+	Candidate IceCandidate
+	Source string
+	Tags []string
+	Timestamp string
+	Type string
 }
 
 type Connection struct {
 	clientId  float64
 	clients   map[float64]chan Response
+	subscribers map[string]map[string]chan Response
 	host      string
 	ws        *websocket.Conn
 	SessionId string
@@ -66,7 +87,15 @@ func (c *Connection) Create(m IMediaObject, options map[string]interface{}) {
 func (c *Connection) handleResponse() {
 	for { // run forever
 		r := Response{}
-		websocket.JSON.Receive(c.ws, &r)
+		var test string
+		if debug {
+			websocket.Message.Receive(c.ws, &test)
+			log.Println(test)
+			json.Unmarshal([]byte(test),&r)
+		} else {
+			websocket.JSON.Receive(c.ws, &r)
+		}
+		
 		if r.Result["sessionId"] != "" {
 			if debug {
 				log.Println("SESSIONID RETURNED")
@@ -76,21 +105,48 @@ func (c *Connection) handleResponse() {
 		// if webscocket client exists, send response to the chanel
 		if c.clients[r.Id] != nil {
 			c.clients[r.Id] <- r
-			// chanel is read, we can delete it
+			// channel is read, we can delete it
 			delete(c.clients, r.Id)
+		} else if r.Method == "onEvent" && c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil{
+			// Need to send it to the channel created on subscription
+			go func() {
+				c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
+			}()
+
 		} else if debug {
-			log.Println("Dropped message because there is no client ", r.Id)
+			if r.Method == "" {
+				log.Println("Dropped message because there is no client ", r.Id)
+			} else {
+				log.Println("Dropped message because there is no subscription", r.Params.Value.Data.Type)
+			}
 			log.Println(r)
 		}
 
 	}
 }
 
+// Allow clients to subscribe to messages intended for them
+func (c *Connection) Subscribe(eventType string, elementId string) <-chan Response {
+	if c.subscribers == nil {
+		c.subscribers = make(map[string]map[string]chan Response)
+	}
+	if _, ok := c.subscribers[eventType] ; !ok {
+		c.subscribers[eventType] = make(map[string]chan Response)
+	}
+	c.subscribers[eventType][elementId] = make(chan Response)
+	return c.subscribers[eventType][elementId]
+}
+
+// Allow clients to unsubscribe from messages intended for them
+func (c *Connection) Unsubscribe(eventType string, elementId string) {
+	delete(c.subscribers[eventType],elementId)
+}
+
 func (c *Connection) Request(req map[string]interface{}) <-chan Response {
 	c.clientId++
 	req["id"] = c.clientId
 	if c.SessionId != "" {
-		req["sesionId"] = c.SessionId
+		req["sessionId"] = c.SessionId
 	}
 	c.clients[c.clientId] = make(chan Response)
 	if debug {
