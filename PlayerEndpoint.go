@@ -1,6 +1,9 @@
 package kurento
 
-import "fmt"
+import (
+	"fmt"
+	"errors"
+	)
 
 type IPlayerEndpoint interface {
 	Play() error
@@ -44,6 +47,9 @@ func (elem *PlayerEndpoint) Play() error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }

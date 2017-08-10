@@ -53,7 +53,7 @@ func (elem *MediaObject) Subscribe(eventType string, handler SubscriptionHandler
 	message := <-elem.connection.Request(req)
 	if message.Error != nil {
 		log.Println("Error trying to subscribe to " + eventType)
-		return message.Error
+		return errors.New(fmt.Sprintf("[%d] %s %s", message.Error.Code, message.Error.Message, message.Error.Data))
 	}
 
 	c := elem.connection.Subscribe(eventType,elem.Id)
@@ -65,7 +65,10 @@ func (elem *MediaObject) Subscribe(eventType string, handler SubscriptionHandler
 	}()
 
 	// Returns error or nil
-	return message.Error
+	if message.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", message.Error.Code, message.Error.Message, message.Error.Data))
+	}
+	return nil
 }
 func (elem *MediaObject) Unsubscribe(eventType string, subscriptionId string) (error) {
 	elem.connection.Unsubscribe(eventType,elem.Id)
@@ -85,14 +88,17 @@ func (elem *MediaObject) Release() (error) {
 	message := <-elem.connection.Request(req)
 	if message.Error != nil {
 		log.Println("Error trying to release " + elem.Id)
-		return message.Error
+		return errors.New(fmt.Sprintf("[%d] %s %s", message.Error.Code, message.Error.Message, message.Error.Data))
 	}
 	if debug {
 		log.Println("Release response: ", message)
 	}
 
 	// Returns error or nil
-	return message.Error
+	if message.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", message.Error.Code, message.Error.Message, message.Error.Data))
+	}
+	return nil
 }
 
 type IServerManager interface {
@@ -263,7 +269,10 @@ func (elem *UriEndpoint) Pause() error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -280,7 +289,10 @@ func (elem *UriEndpoint) Stop() error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -343,8 +355,10 @@ func (elem *SdpEndpoint) GenerateOffer() (string, error) {
 	response := <-elem.connection.Request(req)
 	// fmt.Println(response.Result["value"])
 	// // The SDP offer.
-
-	return response.Result["value"].(string), response.Error
+	if response.Error != nil {
+		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return response.Result["value"].(string), nil
 
 }
 
@@ -369,8 +383,10 @@ func (elem *SdpEndpoint) ProcessOffer(offer string) (string, error) {
 	response := <-elem.connection.Request(req)
 
 	// // The chosen configuration from the ones stated in the SDP offer
-
-	return response.Result["value"].(string), response.Error
+	if response.Error != nil {
+		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return response.Result["value"].(string), nil
 
 }
 
@@ -395,8 +411,10 @@ func (elem *SdpEndpoint) ProcessAnswer(answer string) (string, error) {
 	response := <-elem.connection.Request(req)
 
 	// // Updated SDP offer, based on the answer received.
-
-	return response.Result["value"].(string), response.Error
+	if response.Error != nil {
+		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return response.Result["value"].(string), nil
 
 }
 
@@ -419,8 +437,10 @@ func (elem *SdpEndpoint) GetLocalSessionDescriptor() (string, error) {
 	response := <-elem.connection.Request(req)
 
 	// // The last agreed SessionSpec
-
-	return response.Result["value"].(string), response.Error
+	if response.Error != nil {
+		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return response.Result["value"].(string), nil
 
 }
 
@@ -441,8 +461,10 @@ func (elem *SdpEndpoint) GetRemoteSessionDescriptor() (string, error) {
 	response := <-elem.connection.Request(req)
 
 	// // The last agreed User Agent session description
-
-	return response.Result["value"].(string), response.Error
+	if response.Error != nil {
+		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return response.Result["value"].(string), nil
 
 }
 
@@ -473,8 +495,8 @@ func (elem *BaseRtpEndpoint) getConstructorParams(from IMediaObject, options map
 }
 
 type IMediaElement interface {
-	GetSourceConnections(mediaType MediaType, description string) ([]ElementConnectionData, error)
-	GetSinkConnections(mediaType MediaType, description string) ([]ElementConnectionData, error)
+	GetSourceConnections(mediaType MediaType, description string) (*[]ElementConnectionData, error)
+	GetSinkConnections(mediaType MediaType, description string) (*[]ElementConnectionData, error)
 	Connect(sink IMediaElement, mediaType MediaType, sourceMediaDescription string, sinkMediaDescription string) error
 	Disconnect(sink IMediaElement, mediaType MediaType, sourceMediaDescription string, sinkMediaDescription string) error
 	SetAudioFormat(caps AudioCaps) error
@@ -505,7 +527,7 @@ func (elem *MediaElement) getConstructorParams(from IMediaObject, options map[st
 // // A list of the connections information that are sending media to this
 // element.
 // // The list will be empty if no sources are found.
-func (elem *MediaElement) GetSourceConnections(mediaType MediaType, description string) ([]ElementConnectionData, error) {
+func (elem *MediaElement) GetSourceConnections(mediaType MediaType, description string) (*[]ElementConnectionData, error) {
 	req := elem.getInvokeRequest()
 
 	params := make(map[string]interface{})
@@ -527,7 +549,10 @@ func (elem *MediaElement) GetSourceConnections(mediaType MediaType, description 
 	// // The list will be empty if no sources are found.
 
 	ret := []ElementConnectionData{}
-	return ret, response.Error
+	if response.Error != nil {
+		return nil, errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return &ret, nil
 
 }
 
@@ -536,7 +561,7 @@ func (elem *MediaElement) GetSourceConnections(mediaType MediaType, description 
 // Returns:
 // // A list of the connections information that arereceiving media from this
 // // element. The list will be empty if no sinks are found.
-func (elem *MediaElement) GetSinkConnections(mediaType MediaType, description string) ([]ElementConnectionData, error) {
+func (elem *MediaElement) GetSinkConnections(mediaType MediaType, description string) (*[]ElementConnectionData, error) {
 	req := elem.getInvokeRequest()
 
 	params := make(map[string]interface{})
@@ -557,7 +582,10 @@ func (elem *MediaElement) GetSinkConnections(mediaType MediaType, description st
 	// // element. The list will be empty if no sinks are found.
 
 	ret := []ElementConnectionData{}
-	return ret, response.Error
+	if response.Error != nil {
+		return nil, errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return &ret, nil
 
 }
 
@@ -585,7 +613,10 @@ func (elem *MediaElement) Connect(sink IMediaElement, mediaType MediaType, sourc
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -612,7 +643,10 @@ func (elem *MediaElement) Disconnect(sink IMediaElement, mediaType MediaType, so
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -635,7 +669,10 @@ func (elem *MediaElement) SetAudioFormat(caps AudioCaps) error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -658,7 +695,10 @@ func (elem *MediaElement) SetVideoFormat(caps VideoCaps) error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -676,6 +716,11 @@ func (elem *MediaElement) GetStats() (*ElementStats, error) {
 
 	// Call server and wait response
 	response := <-elem.connection.Request(req)
+	// Check for error first
+	if response.Error != nil { 
+		return nil, errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	// Otherwise should try to get stuff
 	elementStats := ElementStats{}
 	if response.Result["value"] != nil {
 		// Get the first element of the map and coerce it to an "ElementStats" object
@@ -685,8 +730,8 @@ func (elem *MediaElement) GetStats() (*ElementStats, error) {
 		}
 		
 	} else {
-		return nil, errors.New("Response Value was nil")
+		return nil, errors.New("getStats Response Value was nil")
 	}
 	// Returns error or nil
-	return &elementStats, response.Error
+	return &elementStats, nil
 }

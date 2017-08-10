@@ -1,6 +1,9 @@
 package kurento
 
-import "fmt"
+import (
+	"fmt"
+	"errors"
+	)
 
 type IWebRtcEndpoint interface {
 	GatherCandidates() error
@@ -49,7 +52,10 @@ func (elem *WebRtcEndpoint) GatherCandidates() error {
 
 	// Otherwise we want to wait for the other candidates
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 }
 
 // Provide a remote ICE candidate
@@ -70,7 +76,10 @@ func (elem *WebRtcEndpoint) AddIceCandidate(candidate IceCandidate) error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 

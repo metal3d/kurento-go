@@ -1,6 +1,9 @@
 package kurento
 
-import "fmt"
+import (
+	"fmt"
+	"errors"
+	)
 
 type IAlphaBlending interface {
 	SetMaster(source HubPort, zOrder int) error
@@ -48,7 +51,10 @@ func (elem *AlphaBlending) SetMaster(source HubPort, zOrder int) error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -75,6 +81,9 @@ func (elem *AlphaBlending) SetPortProperties(relativeX float64, relativeY float6
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }

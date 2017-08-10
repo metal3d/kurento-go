@@ -1,6 +1,9 @@
 package kurento
 
-import "fmt"
+import (
+	"fmt"
+	"errors"
+	)
 
 type IMixer interface {
 	Connect(media MediaType, source HubPort, sink HubPort) error
@@ -49,7 +52,10 @@ func (elem *Mixer) Connect(media MediaType, source HubPort, sink HubPort) error 
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }
 
@@ -74,6 +80,9 @@ func (elem *Mixer) Disconnect(media MediaType, source HubPort, sink HubPort) err
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	return response.Error
+	if response.Error != nil { 
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 
 }

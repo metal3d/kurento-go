@@ -1,6 +1,9 @@
 package kurento
 
-import "fmt"
+import (
+	"fmt"
+	"errors"
+	)
 
 type IHttpGetEndpoint interface {
 }
@@ -90,7 +93,9 @@ func (elem *HttpEndpoint) GetUrl() (string, error) {
 	response := <-elem.connection.Request(req)
 
 	// // The url as a String
-
-	return response.Result["value"].(string), response.Error
+	if response.Error != nil {
+		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return response.Result["value"].(string), nil
 
 }
