@@ -478,6 +478,7 @@ type IMediaElement interface {
 	Disconnect(sink IMediaElement, mediaType MediaType, sourceMediaDescription string, sinkMediaDescription string) error
 	SetAudioFormat(caps AudioCaps) error
 	SetVideoFormat(caps VideoCaps) error
+	GetStats() (ElementStats, error)
 }
 
 // Basic building blocks of the media server, that can be interconnected through
@@ -658,4 +659,25 @@ func (elem *MediaElement) SetVideoFormat(caps VideoCaps) error {
 	// Returns error or nil
 	return response.Error
 
+}
+
+// Get the stats associated with this media element 
+func (elem *MediaElement) GetStats() (ElementStats, error) {
+	req := elem.getInvokeRequest()
+
+	params := make(map[string]interface{})
+
+	req["params"] = map[string]interface{}{
+		"operation":       "getStats",
+		"object":          elem.Id,
+		"operationParams": params,
+	}
+
+	// Call server and wait response
+	response := <-elem.connection.Request(req)
+	elementStats := ElementStats{
+
+	}
+	// Returns error or nil
+	return elementStats, response.Error
 }

@@ -31,7 +31,7 @@ type Response struct {
 }
 
 type params struct {
-	Value  value
+	Value  map[string]interface{}
 	Object string
 	Type string
 }
@@ -102,22 +102,31 @@ func (c *Connection) handleResponse() {
 			}
 			c.SessionId = r.Result["sessionId"]
 		}
-		// if webscocket client exists, send response to the chanel
+
+		var data map[string]interface{}
+
+		if r.Params.Value["data"] != nil {
+			log.Println(r.Params.Value["data"])
+			data = r.Params.Value["data"].(map[string]interface{})
+			log.Println(data)
+		}
+
+		// if webscocket client exists, send response to the channel
 		if c.clients[r.Id] != nil {
 			c.clients[r.Id] <- r
 			// channel is read, we can delete it
 			delete(c.clients, r.Id)
-		} else if r.Method == "onEvent" && c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil{
+		} else if r.Method == "onEvent" && c.subscribers[data["type"].(string)][data["source"].(string)] != nil{
 			// Need to send it to the channel created on subscription
 			go func() {
-				c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
+				c.subscribers[data["type"].(string)][data["source"].(string)] <- r
 			}()
 
 		} else if debug {
 			if r.Method == "" {
 				log.Println("Dropped message because there is no client ", r.Id)
 			} else {
-				log.Println("Dropped message because there is no subscription", r.Params.Value.Data.Type)
+				log.Println("Dropped message because there is no subscription", r.Params.Value["data"].(map[string]string)["type"])
 			}
 			log.Println(r)
 		}
