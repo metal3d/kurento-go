@@ -91,6 +91,6 @@ func (elem *HttpEndpoint) GetUrl() (string, error) {
 
 	// // The url as a String
 
-	return response.Result["value"], response.Error
+	return response.Result["value"].(string), response.Error
 
 }

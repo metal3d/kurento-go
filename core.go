@@ -3,6 +3,7 @@ package kurento
 import (
 	"fmt"
 	"log"
+	"errors"
 	)
 
 // Base for all objects that can be created in the media server.
@@ -343,7 +344,7 @@ func (elem *SdpEndpoint) GenerateOffer() (string, error) {
 	// fmt.Println(response.Result["value"])
 	// // The SDP offer.
 
-	return response.Result["value"], response.Error
+	return response.Result["value"].(string), response.Error
 
 }
 
@@ -369,7 +370,7 @@ func (elem *SdpEndpoint) ProcessOffer(offer string) (string, error) {
 
 	// // The chosen configuration from the ones stated in the SDP offer
 
-	return response.Result["value"], response.Error
+	return response.Result["value"].(string), response.Error
 
 }
 
@@ -395,7 +396,7 @@ func (elem *SdpEndpoint) ProcessAnswer(answer string) (string, error) {
 
 	// // Updated SDP offer, based on the answer received.
 
-	return response.Result["value"], response.Error
+	return response.Result["value"].(string), response.Error
 
 }
 
@@ -419,7 +420,7 @@ func (elem *SdpEndpoint) GetLocalSessionDescriptor() (string, error) {
 
 	// // The last agreed SessionSpec
 
-	return response.Result["value"], response.Error
+	return response.Result["value"].(string), response.Error
 
 }
 
@@ -441,7 +442,7 @@ func (elem *SdpEndpoint) GetRemoteSessionDescriptor() (string, error) {
 
 	// // The last agreed User Agent session description
 
-	return response.Result["value"], response.Error
+	return response.Result["value"].(string), response.Error
 
 }
 
@@ -478,7 +479,7 @@ type IMediaElement interface {
 	Disconnect(sink IMediaElement, mediaType MediaType, sourceMediaDescription string, sinkMediaDescription string) error
 	SetAudioFormat(caps AudioCaps) error
 	SetVideoFormat(caps VideoCaps) error
-	GetStats() (ElementStats, error)
+	GetStats() (*ElementStats, error)
 }
 
 // Basic building blocks of the media server, that can be interconnected through
@@ -662,7 +663,7 @@ func (elem *MediaElement) SetVideoFormat(caps VideoCaps) error {
 }
 
 // Get the stats associated with this media element 
-func (elem *MediaElement) GetStats() (ElementStats, error) {
+func (elem *MediaElement) GetStats() (*ElementStats, error) {
 	req := elem.getInvokeRequest()
 
 	params := make(map[string]interface{})
@@ -675,9 +676,17 @@ func (elem *MediaElement) GetStats() (ElementStats, error) {
 
 	// Call server and wait response
 	response := <-elem.connection.Request(req)
-	elementStats := ElementStats{
-
+	elementStats := ElementStats{}
+	if response.Result["value"] != nil {
+		// Get the first element of the map and coerce it to an "ElementStats" object
+		for k := range response.Result["value"].(map[string]ElementStats) {
+			elementStats = response.Result["value"].(map[string]ElementStats)[k]
+			break
+		}
+		
+	} else {
+		return nil, errors.New("Response Value was nil")
 	}
 	// Returns error or nil
-	return elementStats, response.Error
+	return &elementStats, response.Error
 }

@@ -221,6 +221,16 @@ type ElementStats struct {
 	SliCount         uint64  // Count the total number of Slice Loss Indication (SLI) packets received by the sender.
 	Ssrc             string  // The synchronized source SSRC
 	// Duplicate TransportId      string  // It is a unique identifier that is associated to the object that was inspected to produce the RTCTransportStats associated with this RTP stream.
+	// 
+	// // RTCInboundRTPStreamStats
+	Jitter float64 // Packet Jitter measured in seconds for this SSRC.
+	PacketsReceived uint64 //Total number of RTP packets received for this SSRC.
+	// Duplicate BytesReceived uint64 //Total number of bytes received for this SSRC.
+	// 
+	// // RTCOutboundRTPStreamStats
+	// Duplicate Jitter float64 // Packet Jitter measured in seconds for this SSRC.
+	PacketsSent uint64 //Total number of RTP packets received for this SSRC.
+	// Duplicate BytesSent uint64 //Total number of bytes received for this SSRC.
 
 	//RTCTransportStats
 	ActiveConnection        bool   //Set to true when transport is active.

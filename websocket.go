@@ -24,14 +24,14 @@ func (e *Error) Error() string {
 type Response struct {
 	Jsonrpc string
 	Id      float64
-	Result  map[string]string // should change if result has no several form
+	Result  map[string]interface{} // should change if result has no several form
 	Error   *Error
 	Method  string
 	Params  params
 }
 
 type params struct {
-	Value  map[string]interface{}
+	Value  value
 	Object string
 	Type string
 }
@@ -100,33 +100,26 @@ func (c *Connection) handleResponse() {
 			if debug {
 				log.Println("SESSIONID RETURNED")
 			}
-			c.SessionId = r.Result["sessionId"]
+			if r.Result["sessionId"] != nil {
+				c.SessionId = r.Result["sessionId"].(string)
+			}
 		}
-
-		var data map[string]interface{}
-
-		if r.Params.Value["data"] != nil {
-			log.Println(r.Params.Value["data"])
-			data = r.Params.Value["data"].(map[string]interface{})
-			log.Println(data)
-		}
-
-		// if webscocket client exists, send response to the channel
+		// if webscocket client exists, send response to the chanel
 		if c.clients[r.Id] != nil {
 			c.clients[r.Id] <- r
 			// channel is read, we can delete it
 			delete(c.clients, r.Id)
-		} else if r.Method == "onEvent" && c.subscribers[data["type"].(string)][data["source"].(string)] != nil{
+		} else if r.Method == "onEvent" && c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil{
 			// Need to send it to the channel created on subscription
 			go func() {
-				c.subscribers[data["type"].(string)][data["source"].(string)] <- r
+				c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
 			}()
 
 		} else if debug {
 			if r.Method == "" {
 				log.Println("Dropped message because there is no client ", r.Id)
 			} else {
-				log.Println("Dropped message because there is no subscription", r.Params.Value["data"].(map[string]string)["type"])
+				log.Println("Dropped message because there is no subscription", r.Params.Value.Data.Type)
 			}
 			log.Println(r)
 		}
