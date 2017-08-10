@@ -71,6 +71,29 @@ func (elem *MediaObject) Unsubscribe(eventType string, subscriptionId string) (e
 	return nil
 }
 
+func (elem *MediaObject) Release() (error) {
+
+	req := elem.getReleaseRequest()
+
+	// params := make(map[string]interface{})
+
+	req["params"] = map[string]interface{}{
+		"object":          elem.Id,
+	}
+	// Call server and go run to the 
+	message := <-elem.connection.Request(req)
+	if message.Error != nil {
+		log.Println("Error trying to release " + elem.Id)
+		return message.Error
+	}
+	if debug {
+		log.Println("Release response: ", message)
+	}
+
+	// Returns error or nil
+	return message.Error
+}
+
 type IServerManager interface {
 }
 

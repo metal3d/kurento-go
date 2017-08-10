@@ -34,6 +34,9 @@ type IMediaObject interface {
 	// remove a subscription to event of 
 	Unsubscribe(eventType string, subscriptionId string) (error)
 
+	// Release the underlying resources in kurento
+	Release() (error)
+
 	// Set ID of the element
 	setId(string)
 
@@ -126,6 +129,13 @@ func (m *MediaObject) getInvokeRequest() map[string]interface{} {
 func (m *MediaObject) getSubscribeRequest() map[string]interface{} {
 	req := m.getCreateRequest()
 	req["method"] = "subscribe"
+
+	return req
+}
+
+func (m *MediaObject) getReleaseRequest() map[string]interface{} {
+	req := m.getCreateRequest()
+	req["method"] = "release"
 
 	return req
 }
