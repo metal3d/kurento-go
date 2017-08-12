@@ -21,25 +21,27 @@ type Response struct {
 	Result  map[string]interface{} // should change if result has no several form
 	Error   *Error
 	Method  string
-	Params  params
+	Params  Params
 }
 
-type params struct {
-	Value  value
+type Params struct {
+	Value  Value
 	Object string
 	Type string
 }
 
-type value struct {
-	Data data
+type Value struct {
+	Data Data
 }
 
-type data struct {
+type Data struct {
 	Candidate IceCandidate
 	Source string
 	Tags []string
 	Timestamp string
 	Type string
+	State string
+	StreamId int
 }
 
 type Connection struct {
