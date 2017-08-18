@@ -1,9 +1,9 @@
 package kurento
 
 import (
-	"fmt"
 	"errors"
-	)
+	"fmt"
+)
 
 type IHttpGetEndpoint interface {
 }
@@ -96,6 +96,6 @@ func (elem *HttpEndpoint) GetUrl() (string, error) {
 	if response.Error != nil {
 		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
-	return response.Result["value"].(string), nil
+	return trimQuotes(string(response.Result.Value)), nil
 
 }

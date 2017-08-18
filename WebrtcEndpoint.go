@@ -1,9 +1,10 @@
 package kurento
 
 import (
-	"fmt"
 	"errors"
-	)
+	"fmt"
+	"log"
+)
 
 type IWebRtcEndpoint interface {
 	GatherCandidates() error
@@ -52,7 +53,7 @@ func (elem *WebRtcEndpoint) GatherCandidates() error {
 
 	// Otherwise we want to wait for the other candidates
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
@@ -65,6 +66,9 @@ func (elem *WebRtcEndpoint) AddIceCandidate(candidate IceCandidate) error {
 	params := make(map[string]interface{})
 
 	setIfNotEmpty(params, "candidate", candidate)
+	setIfNotEmpty(params, "__type__", "IceCandidate")
+	setIfNotEmpty(params, "__module__", "kurento")
+	log.Println(params)
 
 	req["params"] = map[string]interface{}{
 		"operation":       "addIceCandidate",
@@ -76,10 +80,9 @@ func (elem *WebRtcEndpoint) AddIceCandidate(candidate IceCandidate) error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
 
 }
-

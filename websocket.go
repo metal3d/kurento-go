@@ -18,16 +18,20 @@ type Error struct {
 type Response struct {
 	Jsonrpc string
 	Id      float64
-	Result  map[string]interface{} // should change if result has no several form
+	Result  result // should change if result has no several form
 	Error   *Error
 	Method  string
 	Params  Params
 }
-
+type result struct {
+	Value     json.RawMessage
+	SessionId string
+	Object    string
+}
 type Params struct {
 	Value  Value
 	Object string
-	Type string
+	Type   string
 }
 
 type Value struct {
@@ -36,21 +40,21 @@ type Value struct {
 
 type Data struct {
 	Candidate IceCandidate
-	Source string
-	Tags []string
+	Source    string
+	Tags      []string
 	Timestamp string
-	Type string
-	State string
-	StreamId int
+	Type      string
+	State     string
+	StreamId  int
 }
 
 type Connection struct {
-	clientId  float64
-	clients   map[float64]chan Response
+	clientId    float64
+	clients     map[float64]chan Response
 	subscribers map[string]map[string]chan Response
-	host      string
-	ws        *websocket.Conn
-	SessionId string
+	host        string
+	ws          *websocket.Conn
+	SessionId   string
 }
 
 var connections = make(map[string]*Connection)
@@ -87,25 +91,23 @@ func (c *Connection) handleResponse() {
 		if debug {
 			websocket.Message.Receive(c.ws, &test)
 			log.Println(test)
-			json.Unmarshal([]byte(test),&r)
+			json.Unmarshal([]byte(test), &r)
 		} else {
 			websocket.JSON.Receive(c.ws, &r)
 		}
-		
-		if r.Result["sessionId"] != "" {
+
+		if r.Result.SessionId != "" {
 			if debug {
 				log.Println("SESSIONID RETURNED")
 			}
-			if r.Result["sessionId"] != nil {
-				c.SessionId = r.Result["sessionId"].(string)
-			}
+			c.SessionId = r.Result.SessionId
 		}
 		// if webscocket client exists, send response to the chanel
 		if c.clients[r.Id] != nil {
 			c.clients[r.Id] <- r
 			// channel is read, we can delete it
 			delete(c.clients, r.Id)
-		} else if r.Method == "onEvent" && c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil{
+		} else if r.Method == "onEvent" && c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil {
 			// Need to send it to the channel created on subscription
 			go func() {
 				c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
@@ -128,7 +130,7 @@ func (c *Connection) Subscribe(eventType string, elementId string) <-chan Respon
 	if c.subscribers == nil {
 		c.subscribers = make(map[string]map[string]chan Response)
 	}
-	if _, ok := c.subscribers[eventType] ; !ok {
+	if _, ok := c.subscribers[eventType]; !ok {
 		c.subscribers[eventType] = make(map[string]chan Response)
 	}
 	c.subscribers[eventType][elementId] = make(chan Response)
@@ -137,7 +139,7 @@ func (c *Connection) Subscribe(eventType string, elementId string) <-chan Respon
 
 // Allow clients to unsubscribe from messages intended for them
 func (c *Connection) Unsubscribe(eventType string, elementId string) {
-	delete(c.subscribers[eventType],elementId)
+	delete(c.subscribers[eventType], elementId)
 }
 
 func (c *Connection) Request(req map[string]interface{}) <-chan Response {

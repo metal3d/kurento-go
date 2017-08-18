@@ -15,7 +15,7 @@ func SetDebug(state bool) {
 }
 
 type SubscriptionHandler interface {
-	Handle (event Response)
+	Handle(event Response)
 }
 
 // IMadiaElement implements some basic methods as getConstructorParams or Create().
@@ -29,13 +29,13 @@ type IMediaObject interface {
 	Create(IMediaObject, map[string]interface{})
 
 	// Add a subscription to event of "type"
-	Subscribe(eventType string, handler SubscriptionHandler) (error)
+	Subscribe(eventType string, handler SubscriptionHandler) error
 
-	// remove a subscription to event of 
-	Unsubscribe(eventType string, subscriptionId string) (error)
+	// remove a subscription to event of
+	Unsubscribe(eventType string, subscriptionId string) error
 
 	// Release the underlying resources in kurento
-	Release() (error)
+	Release() error
 
 	// Set ID of the element
 	setId(string)
@@ -67,18 +67,22 @@ func (elem *MediaObject) Create(m IMediaObject, options map[string]interface{}) 
 	res := <-elem.connection.Request(req)
 
 	if debug {
-		log.Println("Oncreate response: ", res)
+		log.Printf("Oncreate response: %+v\n", res)
+		log.Println(len(res.Result.Value))
+		if len(res.Result.Value) != 0 {
+			log.Println(string(res.Result.Value))
+		}
 	}
 
-	if res.Result["value"] != "" {
+	if len(res.Result.Value) != 0 {
 		elem.addChild(m)
 		//m.setParent(elem)
-		m.setId(res.Result["value"].(string))
+		m.setId(trimQuotes(string(res.Result.Value)))
 	}
 }
 
 // Create an object in memory that represents a remote object without creating it
-func HydrateMediaObject(id string, parent IMediaObject, c *Connection, elem IMediaObject) (error) {
+func HydrateMediaObject(id string, parent IMediaObject, c *Connection, elem IMediaObject) error {
 	elem.setConnection(c)
 	elem.setId(id)
 	if parent != nil {
@@ -139,6 +143,7 @@ func (m *MediaObject) getReleaseRequest() map[string]interface{} {
 
 	return req
 }
+
 // String implements fmt.Stringer interface, return ID
 func (m *MediaObject) String() string {
 	return m.Id
@@ -158,26 +163,40 @@ func mergeOptions(a, b map[string]interface{}) {
 }
 
 func setIfNotEmpty(param map[string]interface{}, name string, t interface{}) {
-
+	log.Println("in Set if not empty")
+	log.Println(t)
 	switch v := t.(type) {
 	case string:
 		if v != "" {
+			log.Println("Set Map Type String")
 			param[name] = v
 		}
 	case int, float64:
 		if v != 0 {
+			log.Println("Set Map Type num")
 			param[name] = v
 		}
 	case bool:
 		if v {
+			log.Println("Set Map Type bool")
 			param[name] = v
 		}
 	case IMediaObject, fmt.Stringer:
 		if v != nil {
 			val := fmt.Sprintf("%s", v)
 			if val != "" {
+				log.Println("Set Map Type Stringer")
 				param[name] = val
 			}
 		}
+	case IceCandidate:
+		val := fmt.Sprintf("%s", v)
+		if val != "" {
+			log.Println("Set Map Type Candidate")
+			param[name] = v
+		}
+	default:
+		log.Println("Couldn't set map type")
+		log.Println(v)
 	}
 }

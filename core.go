@@ -1,10 +1,12 @@
 package kurento
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
-	"errors"
-	)
+	"strings"
+)
 
 // Base for all objects that can be created in the media server.
 type MediaObject struct {
@@ -39,24 +41,24 @@ func (elem *MediaObject) getConstructorParams(from IMediaObject, options map[str
 
 }
 
-func (elem *MediaObject) Subscribe(eventType string, handler SubscriptionHandler) (error) {
+func (elem *MediaObject) Subscribe(eventType string, handler SubscriptionHandler) error {
 
 	req := elem.getSubscribeRequest()
 
 	// params := make(map[string]interface{})
 
 	req["params"] = map[string]interface{}{
-		"type":       eventType,
-		"object":          elem.Id,
+		"type":   eventType,
+		"object": elem.Id,
 	}
-	// Call server and go run to the 
+	// Call server and go run to the
 	message := <-elem.connection.Request(req)
 	if message.Error != nil {
 		log.Println("Error trying to subscribe to " + eventType)
 		return errors.New(fmt.Sprintf("[%d] %s %s", message.Error.Code, message.Error.Message, message.Error.Data))
 	}
 
-	c := elem.connection.Subscribe(eventType,elem.Id)
+	c := elem.connection.Subscribe(eventType, elem.Id)
 	go func() {
 		for {
 			msg := <-c
@@ -65,26 +67,26 @@ func (elem *MediaObject) Subscribe(eventType string, handler SubscriptionHandler
 	}()
 
 	// Returns error or nil
-	if message.Error != nil { 
+	if message.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", message.Error.Code, message.Error.Message, message.Error.Data))
 	}
 	return nil
 }
-func (elem *MediaObject) Unsubscribe(eventType string, subscriptionId string) (error) {
-	elem.connection.Unsubscribe(eventType,elem.Id)
+func (elem *MediaObject) Unsubscribe(eventType string, subscriptionId string) error {
+	elem.connection.Unsubscribe(eventType, elem.Id)
 	return nil
 }
 
-func (elem *MediaObject) Release() (error) {
+func (elem *MediaObject) Release() error {
 
 	req := elem.getReleaseRequest()
 
 	// params := make(map[string]interface{})
 
 	req["params"] = map[string]interface{}{
-		"object":          elem.Id,
+		"object": elem.Id,
 	}
-	// Call server and go run to the 
+	// Call server and go run to the
 	message := <-elem.connection.Request(req)
 	if message.Error != nil {
 		log.Println("Error trying to release " + elem.Id)
@@ -95,7 +97,7 @@ func (elem *MediaObject) Release() (error) {
 	}
 
 	// Returns error or nil
-	if message.Error != nil { 
+	if message.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", message.Error.Code, message.Error.Message, message.Error.Data))
 	}
 	return nil
@@ -269,7 +271,7 @@ func (elem *UriEndpoint) Pause() error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
@@ -289,7 +291,7 @@ func (elem *UriEndpoint) Stop() error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
@@ -358,7 +360,7 @@ func (elem *SdpEndpoint) GenerateOffer() (string, error) {
 	if response.Error != nil {
 		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
-	return response.Result["value"].(string), nil
+	return trimQuotes(string(response.Result.Value)), nil
 
 }
 
@@ -386,7 +388,7 @@ func (elem *SdpEndpoint) ProcessOffer(offer string) (string, error) {
 	if response.Error != nil {
 		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
-	return response.Result["value"].(string), nil
+	return trimQuotes(string(response.Result.Value)), nil
 
 }
 
@@ -414,7 +416,7 @@ func (elem *SdpEndpoint) ProcessAnswer(answer string) (string, error) {
 	if response.Error != nil {
 		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
-	return response.Result["value"].(string), nil
+	return trimQuotes(string(response.Result.Value)), nil
 
 }
 
@@ -440,7 +442,7 @@ func (elem *SdpEndpoint) GetLocalSessionDescriptor() (string, error) {
 	if response.Error != nil {
 		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
-	return response.Result["value"].(string), nil
+	return trimQuotes(string(response.Result.Value)), nil
 
 }
 
@@ -464,7 +466,7 @@ func (elem *SdpEndpoint) GetRemoteSessionDescriptor() (string, error) {
 	if response.Error != nil {
 		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
-	return response.Result["value"].(string), nil
+	return trimQuotes(string(response.Result.Value)), nil
 
 }
 
@@ -501,7 +503,7 @@ type IMediaElement interface {
 	Disconnect(sink IMediaElement, mediaType MediaType, sourceMediaDescription string, sinkMediaDescription string) error
 	SetAudioFormat(caps AudioCaps) error
 	SetVideoFormat(caps VideoCaps) error
-	GetStats() (*ElementStats, error)
+	GetStats() (map[string]ElementStats, error)
 }
 
 // Basic building blocks of the media server, that can be interconnected through
@@ -613,7 +615,7 @@ func (elem *MediaElement) Connect(sink IMediaElement, mediaType MediaType, sourc
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
@@ -643,7 +645,7 @@ func (elem *MediaElement) Disconnect(sink IMediaElement, mediaType MediaType, so
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
@@ -669,7 +671,7 @@ func (elem *MediaElement) SetAudioFormat(caps AudioCaps) error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
@@ -695,15 +697,15 @@ func (elem *MediaElement) SetVideoFormat(caps VideoCaps) error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil
 
 }
 
-// Get the stats associated with this media element 
-func (elem *MediaElement) GetStats() (*ElementStats, error) {
+// Get the stats associated with this media element
+func (elem *MediaElement) GetStats() (map[string]ElementStats, error) {
 	req := elem.getInvokeRequest()
 
 	params := make(map[string]interface{})
@@ -717,21 +719,26 @@ func (elem *MediaElement) GetStats() (*ElementStats, error) {
 	// Call server and wait response
 	response := <-elem.connection.Request(req)
 	// Check for error first
-	if response.Error != nil { 
+	if response.Error != nil {
 		return nil, errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	// Otherwise should try to get stuff
-	elementStats := ElementStats{}
-	if response.Result["value"] != nil {
+	elementStats := make(map[string]ElementStats)
+	if string(response.Result.Value) != "" {
 		// Get the first element of the map and coerce it to an "ElementStats" object
-		for k := range response.Result["value"].(map[string]ElementStats) {
-			elementStats = response.Result["value"].(map[string]ElementStats)[k]
-			break
+		err := json.Unmarshal(response.Result.Value, &elementStats)
+		if err != nil {
+			log.Println(err)
+			return nil, err
 		}
-		
+
 	} else {
 		return nil, errors.New("getStats Response Value was nil")
 	}
 	// Returns error or nil
-	return &elementStats, nil
+	return elementStats, nil
+}
+
+func trimQuotes(v string) string {
+	return strings.Trim(v, "\"")
 }

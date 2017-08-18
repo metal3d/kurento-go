@@ -19,9 +19,9 @@ const (
 )
 
 type IceCandidate struct {
-	Candidate     string
-	SdpMid        string
-	SdpMLineIndex int
+	Candidate     string `json:"candidate"`
+	SdpMid        string `json:"sdpMid"`
+	SdpMLineIndex int    `json:"sdpMLineIndex"`
 }
 
 type ServerInfo struct {
@@ -177,12 +177,12 @@ type ElementStats struct {
 	AvailableOutgoingBitrate float64 //Measured in Bits per second, and is implementation dependent.
 	// Duplicate BytesReceived            uint64  // Represents the total number of payload bytes received on this candidate pair, i.e., not including headers or padding.
 	// Duplicate BytesSent                uint64  //Represents the total number of payload bytes sent on this candidate pair, i.e., not including headers or padding.
-	LocalCandidateId         string  //It is a unique identifier that is associated to the object that was inspected to produce the RTCIceCandidateAttributes for the local candidate associated with this candidate pair.
-	Nominated                bool    //Related to updating the nominated flag described in Section 7.1.3.2.4 of [RFC5245].
+	LocalCandidateId string //It is a unique identifier that is associated to the object that was inspected to produce the RTCIceCandidateAttributes for the local candidate associated with this candidate pair.
+	Nominated        bool   //Related to updating the nominated flag described in Section 7.1.3.2.4 of [RFC5245].
 	// Duplicate Priority                 uint64  //Calculated from candidate priorities as defined in [RFC5245] section 5.7.2.
-	Readable                 bool    //Has gotten a valid incoming ICE request.
-	RemoteCandidateId        string  //It is a unique identifier that is associated to the object that was inspected to produce the RTCIceCandidateAttributes for the remote candidate associated with this candidate pair.
-	RoundTripTime            float64 // Represents the RTT computed by the STUN connectivity checks
+	Readable          bool    //Has gotten a valid incoming ICE request.
+	RemoteCandidateId string  //It is a unique identifier that is associated to the object that was inspected to produce the RTCIceCandidateAttributes for the remote candidate associated with this candidate pair.
+	RoundTripTime     float64 // Represents the RTT computed by the STUN connectivity checks
 	//State RTCStatsIceCandidatePairState //Represents the state of the checklist for the local and remote candidates in a pair.
 	TransportId string //It is a unique identifier that is associated to the object that was inspected to produce the RTCTransportStats associated with this candidate pair.
 	Writable    bool   // Has gotten ACK to an ICE request.
@@ -221,19 +221,19 @@ type ElementStats struct {
 	SliCount         uint64  // Count the total number of Slice Loss Indication (SLI) packets received by the sender.
 	Ssrc             string  // The synchronized source SSRC
 	// Duplicate TransportId      string  // It is a unique identifier that is associated to the object that was inspected to produce the RTCTransportStats associated with this RTP stream.
-	// 
+	//
 	// // RTCInboundRTPStreamStats
-	Jitter float64 // Packet Jitter measured in seconds for this SSRC.
-	PacketsReceived uint64 //Total number of RTP packets received for this SSRC.
+	Jitter          float64 // Packet Jitter measured in seconds for this SSRC.
+	PacketsReceived uint64  //Total number of RTP packets received for this SSRC.
 	// Duplicate BytesReceived uint64 //Total number of bytes received for this SSRC.
-	// 
+	//
 	// // RTCOutboundRTPStreamStats
 	// Duplicate Jitter float64 // Packet Jitter measured in seconds for this SSRC.
 	PacketsSent uint64 //Total number of RTP packets received for this SSRC.
 	// Duplicate BytesSent uint64 //Total number of bytes received for this SSRC.
 
 	//RTCTransportStats
-	ActiveConnection        bool   //Set to true when transport is active.
+	ActiveConnection bool //Set to true when transport is active.
 	// Duplicate BytesReceived           uint64 // Represents the total number of bytes received on this PeerConnection, i.e., not including headers or padding.
 	// Duplicate BytesSent               uint64 // Represents the total number of payload bytes sent on this PeerConnection, i.e., not including headers or padding.
 	LocalCertificateId      string // For components where DTLS is negotiated, give local certificate.
