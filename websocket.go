@@ -3,6 +3,7 @@ package kurento
 import (
 	"encoding/json"
 	"log"
+	"strings"
 
 	"golang.org/x/net/websocket"
 )
@@ -60,9 +61,9 @@ type Connection struct {
 var connections = make(map[string]*Connection)
 
 func NewConnection(host string) *Connection {
-	if connections[host] != nil {
-		return connections[host]
-	}
+	// if connections[host] != nil {
+	// 	return connections[host]
+	// }
 
 	c := new(Connection)
 	connections[host] = c
@@ -84,19 +85,30 @@ func (c *Connection) Create(m IMediaObject, options map[string]interface{}) {
 	elem.Create(m, options)
 }
 
+func (c *Connection) Close() error {
+	return c.ws.Close()
+}
+
 func (c *Connection) handleResponse() {
+	var err error
+	var test string
+	var r Response
 	for { // run forever
-		r := Response{}
-		var test string
+		r = Response{}
 		if debug {
-			websocket.Message.Receive(c.ws, &test)
+			err = websocket.Message.Receive(c.ws, &test)
 			log.Println(test)
 			json.Unmarshal([]byte(test), &r)
 		} else {
-			websocket.JSON.Receive(c.ws, &r)
+			err = websocket.JSON.Receive(c.ws, &r)
+		}
+		if err != nil {
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				break
+			}
 		}
 
-		if r.Result.SessionId != "" {
+		if r.Result.SessionId != "" && c.SessionId != r.Result.SessionId {
 			if debug {
 				log.Println("SESSIONID RETURNED")
 			}
