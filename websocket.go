@@ -116,15 +116,17 @@ func (c *Connection) handleResponse() {
 		}
 		// if webscocket client exists, send response to the chanel
 		if c.clients[r.Id] != nil {
-			c.clients[r.Id] <- r
-			// channel is read, we can delete it
-			delete(c.clients, r.Id)
+			go func(r Response) {
+				c.clients[r.Id] <- r
+				// channel is read, we can delete it
+				close(c.clients[r.Id])
+				delete(c.clients, r.Id)
+			}(r)
 		} else if r.Method == "onEvent" && c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil {
 			// Need to send it to the channel created on subscription
-			go func() {
+			go func(r Response) {
 				c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
-			}()
-
+			}(r)
 		} else if debug {
 			if r.Method == "" {
 				log.Println("Dropped message because there is no client ", r.Id)
@@ -133,7 +135,6 @@ func (c *Connection) handleResponse() {
 			}
 			log.Println(r)
 		}
-
 	}
 }
 
@@ -151,6 +152,7 @@ func (c *Connection) Subscribe(eventType string, elementId string) <-chan Respon
 
 // Allow clients to unsubscribe from messages intended for them
 func (c *Connection) Unsubscribe(eventType string, elementId string) {
+	close(c.subscribers[eventType][elementId])
 	delete(c.subscribers[eventType], elementId)
 }
 
