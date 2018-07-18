@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
+	"sync"
 
 	"golang.org/x/net/websocket"
 )
@@ -50,12 +51,22 @@ type Data struct {
 }
 
 type Connection struct {
-	clientId    float64
-	clients     map[float64]chan Response
+	clientId      float64
+	clientMap     threadsafeClientMap
+	subscriberMap threadsafeSubscriberMap
+	host          string
+	ws            *websocket.Conn
+	SessionId     string
+}
+
+type threadsafeClientMap struct {
+	clients map[float64]chan Response
+	lock    sync.RWMutex
+}
+
+type threadsafeSubscriberMap struct {
 	subscribers map[string]map[string]chan Response
-	host        string
-	ws          *websocket.Conn
-	SessionId   string
+	lock        sync.RWMutex
 }
 
 var connections = make(map[string]*Connection)
@@ -68,7 +79,10 @@ func NewConnection(host string) *Connection {
 	c := new(Connection)
 	connections[host] = c
 
-	c.clients = make(map[float64]chan Response)
+	c.clientMap = threadsafeClientMap{
+		clients: make(map[float64]chan Response),
+		lock:    sync.RWMutex{},
+	}
 	var err error
 	c.ws, err = websocket.Dial(host+"/kurento", "", "http://127.0.0.1")
 	if err != nil {
@@ -115,17 +129,23 @@ func (c *Connection) handleResponse() {
 			c.SessionId = r.Result.SessionId
 		}
 		// if webscocket client exists, send response to the chanel
-		if c.clients[r.Id] != nil {
+		c.clientMap.lock.RLock()
+		c.subscriberMap.lock.RLock()
+		if c.clientMap.clients[r.Id] != nil {
 			go func(r Response) {
-				c.clients[r.Id] <- r
+				c.clientMap.clients[r.Id] <- r
 				// channel is read, we can delete it
-				close(c.clients[r.Id])
-				delete(c.clients, r.Id)
+				c.clientMap.lock.Lock()
+				close(c.clientMap.clients[r.Id])
+				delete(c.clientMap.clients, r.Id)
+				c.clientMap.lock.Unlock()
 			}(r)
-		} else if r.Method == "onEvent" && c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil {
+		} else if r.Method == "onEvent" && c.subscriberMap.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil {
 			// Need to send it to the channel created on subscription
 			go func(r Response) {
-				c.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
+				c.subscriberMap.lock.RLock()
+				c.subscriberMap.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
+				c.subscriberMap.lock.RUnlock()
 			}(r)
 		} else if debug {
 			if r.Method == "" {
@@ -135,25 +155,31 @@ func (c *Connection) handleResponse() {
 			}
 			log.Println(r)
 		}
+		c.clientMap.lock.RUnlock()
+		c.subscriberMap.lock.RUnlock()
 	}
 }
 
 // Allow clients to subscribe to messages intended for them
 func (c *Connection) Subscribe(eventType string, elementId string) <-chan Response {
-	if c.subscribers == nil {
-		c.subscribers = make(map[string]map[string]chan Response)
+	if c.subscriberMap.subscribers == nil {
+		c.subscriberMap.subscribers = make(map[string]map[string]chan Response)
 	}
-	if _, ok := c.subscribers[eventType]; !ok {
-		c.subscribers[eventType] = make(map[string]chan Response)
+	c.subscriberMap.lock.Lock()
+	defer c.subscriberMap.lock.Unlock()
+	if _, ok := c.subscriberMap.subscribers[eventType]; !ok {
+		c.subscriberMap.subscribers[eventType] = make(map[string]chan Response)
 	}
-	c.subscribers[eventType][elementId] = make(chan Response)
-	return c.subscribers[eventType][elementId]
+	c.subscriberMap.subscribers[eventType][elementId] = make(chan Response)
+	return c.subscriberMap.subscribers[eventType][elementId]
 }
 
 // Allow clients to unsubscribe from messages intended for them
 func (c *Connection) Unsubscribe(eventType string, elementId string) {
-	close(c.subscribers[eventType][elementId])
-	delete(c.subscribers[eventType], elementId)
+	c.subscriberMap.lock.Lock()
+	defer c.subscriberMap.lock.Unlock()
+	close(c.subscriberMap.subscribers[eventType][elementId])
+	delete(c.subscriberMap.subscribers[eventType], elementId)
 }
 
 func (c *Connection) Request(req map[string]interface{}) <-chan Response {
@@ -162,11 +188,13 @@ func (c *Connection) Request(req map[string]interface{}) <-chan Response {
 	if c.SessionId != "" {
 		req["sessionId"] = c.SessionId
 	}
-	c.clients[c.clientId] = make(chan Response)
+	c.clientMap.lock.Lock()
+	defer c.clientMap.lock.Unlock()
+	c.clientMap.clients[c.clientId] = make(chan Response)
 	if debug {
 		j, _ := json.MarshalIndent(req, "", "    ")
 		log.Println("json", string(j))
 	}
 	websocket.JSON.Send(c.ws, req)
-	return c.clients[c.clientId]
+	return c.clientMap.clients[c.clientId]
 }
