@@ -162,11 +162,11 @@ func (c *Connection) handleResponse() {
 
 // Allow clients to subscribe to messages intended for them
 func (c *Connection) Subscribe(eventType string, elementId string) <-chan Response {
+	c.subscriberMap.lock.Lock()
+	defer c.subscriberMap.lock.Unlock()
 	if c.subscriberMap.subscribers == nil {
 		c.subscriberMap.subscribers = make(map[string]map[string]chan Response)
 	}
-	c.subscriberMap.lock.Lock()
-	defer c.subscriberMap.lock.Unlock()
 	if _, ok := c.subscriberMap.subscribers[eventType]; !ok {
 		c.subscriberMap.subscribers[eventType] = make(map[string]chan Response)
 	}
