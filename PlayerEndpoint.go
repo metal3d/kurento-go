@@ -1,9 +1,9 @@
 package kurento
 
 import (
-	"fmt"
 	"errors"
-	)
+	"fmt"
+)
 
 type IPlayerEndpoint interface {
 	Play() error
@@ -22,9 +22,8 @@ func (elem *PlayerEndpoint) getConstructorParams(from IMediaObject, options map[
 
 	// Create basic constructor params
 	ret := map[string]interface{}{
-		"mediaPipeline":   fmt.Sprintf("%s", from),
-		"uri":             "",
-		"useEncodedMedia": fmt.Sprintf("%s", from),
+		"mediaPipeline": fmt.Sprintf("%s", from),
+		"uri":           elem.Uri,
 	}
 
 	// then merge options
@@ -47,7 +46,7 @@ func (elem *PlayerEndpoint) Play() error {
 	response := <-elem.connection.Request(req)
 
 	// Returns error or nil
-	if response.Error != nil { 
+	if response.Error != nil {
 		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
 	}
 	return nil

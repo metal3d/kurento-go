@@ -2,10 +2,13 @@ package kurento
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"strings"
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/websocket"
 )
 
@@ -13,7 +16,11 @@ import (
 type Error struct {
 	Code    int64
 	Message string
-	Data    string
+	Data    map[string]interface{}
+}
+
+func (e *Error) Error() string {
+	return e.Message
 }
 
 // Response represents server response
@@ -71,7 +78,7 @@ type threadsafeSubscriberMap struct {
 
 var connections = make(map[string]*Connection)
 
-func NewConnection(host string) *Connection {
+func NewConnection(host string) (*Connection, error) {
 	// if connections[host] != nil {
 	// 	return connections[host]
 	// }
@@ -86,17 +93,17 @@ func NewConnection(host string) *Connection {
 	var err error
 	c.ws, err = websocket.Dial(host+"/kurento", "", "http://127.0.0.1")
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("kurento: error dialing: %v", err)
 	}
 	c.host = host
 	go c.handleResponse()
-	return c
+	return c, nil
 }
 
-func (c *Connection) Create(m IMediaObject, options map[string]interface{}) {
+func (c *Connection) Create(m IMediaObject, options map[string]interface{}) error {
 	elem := &MediaObject{}
 	elem.setConnection(c)
-	elem.Create(m, options)
+	return elem.Create(m, options)
 }
 
 func (c *Connection) Close() error {
@@ -117,8 +124,11 @@ func (c *Connection) handleResponse() {
 			err = websocket.JSON.Receive(c.ws, &r)
 		}
 		if err != nil {
-			if strings.Contains(err.Error(), "use of closed network connection") {
+			if strings.Contains(err.Error(), "use of closed network connection") || err == io.EOF {
 				break
+			} else {
+				log.Println(fmt.Errorf("kurento: %s", err.Error()))
+				continue
 			}
 		}
 
@@ -153,7 +163,7 @@ func (c *Connection) handleResponse() {
 			} else {
 				log.Println("Dropped message because there is no subscription", r.Params.Value.Data.Type)
 			}
-			log.Println(r)
+			spew.Dump(r)
 		}
 		c.clientMap.lock.RUnlock()
 		c.subscriberMap.lock.RUnlock()
