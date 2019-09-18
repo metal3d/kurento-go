@@ -26,7 +26,7 @@ type IMediaObject interface {
 
 	// Each media object should be able to create another object
 	// Those options are sent to getConstructorParams
-	Create(IMediaObject, map[string]interface{})
+	Create(IMediaObject, map[string]interface{}) error
 
 	// Add a subscription to event of "type"
 	Subscribe(eventType string, handler SubscriptionHandler) error
@@ -50,7 +50,7 @@ type IMediaObject interface {
 }
 
 // Create object "m" with given "options"
-func (elem *MediaObject) Create(m IMediaObject, options map[string]interface{}) {
+func (elem *MediaObject) Create(m IMediaObject, options map[string]interface{}) error {
 	req := elem.getCreateRequest()
 	constparams := m.getConstructorParams(elem, options)
 	// TODO params["sessionId"]
@@ -67,7 +67,7 @@ func (elem *MediaObject) Create(m IMediaObject, options map[string]interface{}) 
 	res := <-elem.connection.Request(req)
 
 	if debug {
-		log.Printf("Oncreate response: %+v\n", res)
+		log.Printf("Oncreate response: %+v\n", string(res.Result.Value))
 		log.Println(len(res.Result.Value))
 		if len(res.Result.Value) != 0 {
 			log.Println(string(res.Result.Value))
@@ -79,6 +79,7 @@ func (elem *MediaObject) Create(m IMediaObject, options map[string]interface{}) 
 		//m.setParent(elem)
 		m.setId(trimQuotes(string(res.Result.Value)))
 	}
+	return res.Error
 }
 
 // Create an object in memory that represents a remote object without creating it

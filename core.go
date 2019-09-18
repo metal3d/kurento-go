@@ -311,7 +311,30 @@ type MediaPipeline struct {
 // Return contructor params to be called by "Create".
 func (elem *MediaPipeline) getConstructorParams(from IMediaObject, options map[string]interface{}) map[string]interface{} {
 	return options
+}
 
+// Set if latency stats are being collected for pipeline
+func (elem *MediaObject) SetLatencyStats(value bool) error {
+	req := elem.getInvokeRequest()
+
+	params := make(map[string]interface{})
+
+	setIfNotEmpty(params, "latencyStats", value)
+
+	req["params"] = map[string]interface{}{
+		"operation":       "setLatencyStats",
+		"object":          elem.Id,
+		"operationParams": params,
+	}
+	log.Println(req)
+
+	// Call server and wait response
+	response := <-elem.connection.Request(req)
+
+	if response.Error != nil {
+		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	}
+	return nil
 }
 
 type ISdpEndpoint interface {

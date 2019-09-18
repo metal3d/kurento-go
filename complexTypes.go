@@ -12,6 +12,7 @@ func (t MediaProfileSpecType) String() string {
 const (
 	MEDIAPROFILESPECTYPE_WEBM            MediaProfileSpecType = "WEBM"
 	MEDIAPROFILESPECTYPE_MP4             MediaProfileSpecType = "MP4"
+	MEDIAPROFILESPECTYPE_FLV             MediaProfileSpecType = "FLV"
 	MEDIAPROFILESPECTYPE_WEBM_VIDEO_ONLY MediaProfileSpecType = "WEBM_VIDEO_ONLY"
 	MEDIAPROFILESPECTYPE_WEBM_AUDIO_ONLY MediaProfileSpecType = "WEBM_AUDIO_ONLY"
 	MEDIAPROFILESPECTYPE_MP4_VIDEO_ONLY  MediaProfileSpecType = "MP4_VIDEO_ONLY"
