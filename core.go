@@ -126,6 +126,41 @@ func (elem *ServerManager) getConstructorParams(from IMediaObject, options map[s
 
 }
 
+func NewServerManager(conn *Connection) *ServerManager {
+	serverManager := &ServerManager{}
+	serverManager.setConnection(conn)
+	return serverManager
+}
+
+func (elem *ServerManager) GetPipelines() ([]string, error) {
+	req := elem.getInvokeRequest()
+
+	req["params"] = map[string]interface{}{
+		"operation": "getPipelines",
+		"object":    "manager_ServerManager",
+	}
+
+	// Call server and wait response
+	response := <-elem.connection.Request(req)
+
+	if response.Error != nil {
+		return nil, fmt.Errorf("[%d] Error getting pipelnes: %s | %s", response.Error.Code, response.Error.Message, response.Error.Data)
+	}
+
+	mediaPipelines := []string{}
+	data, err := response.Result.Value.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(data, &mediaPipelines)
+	if err != nil {
+		return nil, err
+	}
+
+	return mediaPipelines, nil
+}
+
 type ISessionEndpoint interface {
 }
 
