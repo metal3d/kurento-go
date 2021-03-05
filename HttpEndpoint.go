@@ -90,8 +90,16 @@ func (elem *HttpEndpoint) GetUrl() (string, error) {
 	}
 
 	// Call server and wait response
-	response := <-elem.connection.Request(req)
-
+	responses, err := elem.connection.Request(req)
+	if err != nil {
+		return "", err
+	}
+	var response Response
+	select {
+	case response = <-responses:
+	case <-elem.connection.closeSig:
+		return "", ErrConnectionClosing
+	}
 	// // The url as a String
 	if response.Error != nil {
 		return "", errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))

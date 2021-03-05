@@ -64,7 +64,16 @@ func (elem *MediaObject) Create(m IMediaObject, options map[string]interface{}) 
 
 	m.setConnection(elem.connection)
 
-	res := <-elem.connection.Request(req)
+	responses, err := elem.connection.Request(req)
+	if err != nil {
+		return err
+	}
+	var res Response
+	select {
+	case res = <-responses:
+	case <-elem.connection.closeSig:
+		return ErrConnectionClosing
+	}
 
 	if debug {
 		log.Printf("Oncreate response: %+v\n", string(res.Result.Value))

@@ -1,9 +1,9 @@
 package kurento
 
 import (
-	"fmt"
 	"errors"
-	)
+	"fmt"
+)
 
 type IAlphaBlending interface {
 	SetMaster(source HubPort, zOrder int) error
@@ -48,12 +48,19 @@ func (elem *AlphaBlending) SetMaster(source HubPort, zOrder int) error {
 	}
 
 	// Call server and wait response
-	response := <-elem.connection.Request(req)
-
-	// Returns error or nil
-	if response.Error != nil { 
-		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	responses, err := elem.connection.Request(req)
+	if err != nil {
+		return err
 	}
+	select {
+	case response := <-responses:
+		if response.Error != nil {
+			return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+		}
+	case <-elem.connection.closeSig:
+		return ErrConnectionClosing
+	}
+
 	return nil
 
 }
@@ -78,12 +85,19 @@ func (elem *AlphaBlending) SetPortProperties(relativeX float64, relativeY float6
 	}
 
 	// Call server and wait response
-	response := <-elem.connection.Request(req)
-
-	// Returns error or nil
-	if response.Error != nil { 
-		return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+	responses, err := elem.connection.Request(req)
+	if err != nil {
+		return err
 	}
+	select {
+	case response := <-responses:
+		if response.Error != nil {
+			return errors.New(fmt.Sprintf("[%d] %s %s", response.Error.Code, response.Error.Message, response.Error.Data))
+		}
+	case <-elem.connection.closeSig:
+		return ErrConnectionClosing
+	}
+
 	return nil
 
 }

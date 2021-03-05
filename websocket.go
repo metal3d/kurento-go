@@ -2,17 +2,18 @@ package kurento
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/websocket"
 )
+
+var ErrConnectionClosing = errors.New("kurento: websocket connection is closing")
 
 // Error that can be filled in response
 type Error struct {
@@ -66,6 +67,9 @@ type Connection struct {
 	host          string
 	ws            *websocket.Conn
 	SessionId     string
+	closeSig      chan bool
+	closeWg       *sync.WaitGroup
+	toCloseCh     chan string
 }
 
 type threadsafeClientMap struct {
@@ -80,6 +84,11 @@ type threadsafeSubscriberMap struct {
 
 func NewConnection(host string) (*Connection, error) {
 	c := new(Connection)
+
+	c.closeSig = make(chan bool)
+	c.closeWg = &sync.WaitGroup{}
+	c.toCloseCh = make(chan string, 1)
+	go awaitClose(c.toCloseCh, c.closeSig, c.closeWg)
 
 	c.clientMap = threadsafeClientMap{
 		clients: make(map[float64]chan Response),
@@ -97,8 +106,16 @@ func NewConnection(host string) (*Connection, error) {
 		return nil, fmt.Errorf("kurento: error dialing: %v", err)
 	}
 	c.host = host
+	c.closeWg.Add(1)
 	go c.handleResponse()
 	return c, nil
+}
+
+func awaitClose(msgs chan string, closeSig chan bool, wg *sync.WaitGroup) {
+	msg := <-msgs
+	log.Println(fmt.Errorf("kurento: websocket closing with err%s", msg))
+	close(closeSig)
+	wg.Wait()
 }
 
 func (c *Connection) Create(m IMediaObject, options map[string]interface{}) error {
@@ -108,29 +125,54 @@ func (c *Connection) Create(m IMediaObject, options map[string]interface{}) erro
 }
 
 func (c *Connection) Close() error {
-	return c.ws.Close()
+	select {
+	case c.toCloseCh <- "Close called":
+	case <-c.closeSig:
+	}
+	c.closeWg.Wait()
+	return nil
+}
+
+type respErr struct {
+	r   Response
+	err error
 }
 
 func (c *Connection) handleResponse() {
+	defer c.closeWg.Done()
+	defer c.ws.Close()
 	var err error
-	var test string
 	var r Response
-	for { // run forever
-		r = Response{}
-		if debug {
-			err = websocket.Message.Receive(c.ws, &test)
-			log.Println(test)
-			json.Unmarshal([]byte(test), &r)
-		} else {
-			err = websocket.JSON.Receive(c.ws, &r)
-		}
-		if err != nil {
-			if strings.Contains(err.Error(), "use of closed network connection") || err == io.EOF {
-				break
+	var retVal respErr
+	resps := make(chan respErr, 1)
+	for {
+		go func() {
+			resp := Response{}
+			var err error
+			if debug {
+				var test string
+				err = websocket.Message.Receive(c.ws, &test)
+				log.Println(test)
+				json.Unmarshal([]byte(test), &resp)
 			} else {
-				log.Println(fmt.Errorf("kurento: %s", err.Error()))
-				continue
+				err = websocket.JSON.Receive(c.ws, &resp)
 			}
+			resps <- respErr{
+				r:   resp,
+				err: err,
+			}
+		}()
+		select {
+		case retVal = <-resps:
+		case <-c.closeSig:
+			return
+		}
+		r = retVal.r
+		err = retVal.err
+
+		if err != nil {
+			c.toCloseCh <- "Error reading from websocket: " + err.Error()
+			return
 		}
 
 		if r.Result.SessionId != "" && c.SessionId != r.Result.SessionId {
@@ -143,9 +185,14 @@ func (c *Connection) handleResponse() {
 		c.clientMap.lock.RLock()
 		c.subscriberMap.lock.RLock()
 		if c.clientMap.clients[r.Id] != nil {
+			c.closeWg.Add(1)
 			go func(r Response) {
-				c.clientMap.clients[r.Id] <- r
-				// channel is read, we can delete it
+				defer c.closeWg.Done()
+				select {
+				case c.clientMap.clients[r.Id] <- r:
+				case <-c.closeSig:
+				}
+				// channel is read or we are closing, we can delete it
 				c.clientMap.lock.Lock()
 				close(c.clientMap.clients[r.Id])
 				delete(c.clientMap.clients, r.Id)
@@ -153,9 +200,14 @@ func (c *Connection) handleResponse() {
 			}(r)
 		} else if r.Method == "onEvent" && c.subscriberMap.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] != nil {
 			// Need to send it to the channel created on subscription
+			c.closeWg.Add(1)
 			go func(r Response) {
+				defer c.closeWg.Done()
 				c.subscriberMap.lock.RLock()
-				c.subscriberMap.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r
+				select {
+				case c.subscriberMap.subscribers[r.Params.Value.Data.Type][r.Params.Value.Data.Source] <- r:
+				case <-c.closeSig:
+				}
 				c.subscriberMap.lock.RUnlock()
 			}(r)
 		} else if debug {
@@ -193,7 +245,7 @@ func (c *Connection) Unsubscribe(eventType string, elementId string) {
 	delete(c.subscriberMap.subscribers[eventType], elementId)
 }
 
-func (c *Connection) Request(req map[string]interface{}) <-chan Response {
+func (c *Connection) Request(req map[string]interface{}) (<-chan Response, error) {
 	c.clientId++
 	req["id"] = c.clientId
 	if c.SessionId != "" {
@@ -206,6 +258,6 @@ func (c *Connection) Request(req map[string]interface{}) <-chan Response {
 		j, _ := json.MarshalIndent(req, "", "    ")
 		log.Println("json", string(j))
 	}
-	websocket.JSON.Send(c.ws, req)
-	return c.clientMap.clients[c.clientId]
+	err := websocket.JSON.Send(c.ws, req)
+	return c.clientMap.clients[c.clientId], err
 }
